@@ -1,23 +1,32 @@
 import arcade
 import math
 import random
+import time
+
+BOT_RED_MODE = True
+BOT_BLUE_MODE = False
+
+ALTERNATIVE_MAP = False
+
+TIME_LIMIT = 20 #In seconds
+TIME_SPEEDUP = 10 #If timeleft < TIME_SPEEDUP: Speed of the closest tank to the middle goes up
+MAX_NUMBER_OF_BALLS = 3    
+COOLDOWN_BETWEEN_BALLS = 60   #In frames. Sec * 60
+
+CONSOLE_DUMP = True
+PRINT_NAMES_IN_CONSOLE = True #Only usable if CONSOLE_DUMP == True
+#FILE_DUMP = False
+#PRINT_NAMES_IN_FILE = False #Only usable if FILE_DUMP == True
+#NEW_FILE = False            #Only usable if FILE_DUMP == True
 
 WIDTH = 720  
 HEIGHT = 480
 METER = 16
 
-
 SCALE_OF_BIMGIMAGES = HEIGHT/1080
 SCALE_OF_SMALLIMAGES = SCALE_OF_BIMGIMAGES/3*6      #Rescaling graphics to match any resolution of screen
 WALL_SIZE_IN_PIXELS = 48
-TIME_LIMIT = 20 #In seconds
 
-BOT_RED_MODE = True
-BOT_BLUE_MODE = True
-ALTERNATIVE_MAP = False
-
-MAX_NUMBER_OF_BALLS = 3    
-COOLDOWN_BETWEEN_BALLS = 60   #In frames. Sec * 60
 
 ROTATION_SPEED = 3
 
@@ -25,7 +34,7 @@ RED_TANK_SPEED = 1
 RED_BULLET_SPEED = 1
 BLUE_TANK_SPEED = 1
 BLUE_BULLET_SPEED = 1
-
+SPEED_MULTIPLIER = 5
 #For calculating distace between two points
 def distance(x1 , y1 , x2 , y2):
     return math.sqrt(math.pow(x2 - x1, 2) +
@@ -46,6 +55,8 @@ class GameWindow(arcade.Window):
         
         self.BLUE_WON = False
         self.RED_WON = False
+        
+        self.WhoIsWinning = "None";
         
         self.time_left_in_frames = TIME_LIMIT * 60
         self.scene = arcade.Scene()
@@ -144,6 +155,9 @@ class GameWindow(arcade.Window):
         self.blue_ball_cooldown = 0
         self.blue_ball_counter = 0
         
+        if CONSOLE_DUMP and PRINT_NAMES_IN_CONSOLE:
+            print("red_x,red_y,red_rotation,red_cannonRotation,red_velocityX,red_velocityY,red_shootCooldown,red_turnLeft,red_turnRight,red_goForward,red_goBack,red_shoot,red_cannonLeft,red_cannonRight,red_bullet3_x,red_bullet3_y,red_bullet3_velocityX,red_bullet3_velocityY,red_bullet2_x,red_bullet2_y,red_bullet2_velocityX,red_bullet2_velocityY,red_bullet1_x,red_bullet1_y,red_bullet1_velocityX,red_bullet1_velocityY,blue_x,blue_y,blue_rotation,blue_cannonRotation,blue_velocityX,blue_velocityY,blue_shootCooldown,blue_turnLeft,blue_turnRight,blue_goForward,blue_goBack,blue_shoot,blue_cannonLeft,blue_cannonRight,blue_bullet3_x,blue_bullet3_y,blue_bullet3_velocityX,blue_bullet3_velocityY,blue_bullet2_x,blue_bullet2_y,blue_bullet2_velocityX,blue_bullet2_velocityY,blue_bullet1_x,blue_bullet1_y,blue_bullet1_velocityX,blue_bullet1_velocityY")
+        
     def on_draw(self):
         self.clear()
         self.scene.draw()
@@ -151,18 +165,12 @@ class GameWindow(arcade.Window):
         
     def on_update(self,delta_time):
         #print(arcade.get_fps())
-        
-        #print(round(self.time_left_in_frames/60,2))
-        #If timeout, closest to middle win
-        if self.time_left_in_frames<=0:
-            red_distance = distance(self.red_tank.center_x,self.red_tank.center_y,WIDTH/2,HEIGHT/2)
-            blue_distance = distance(self.blue_tank.center_x,self.blue_tank.center_y,WIDTH/2,HEIGHT/2)
-            if red_distance == blue_distance:
-                self.end_screen("Assets/DRAW.png",SCALE_OF_BIMGIMAGES)
-            else:
-                self.end_screen("Assets/RED_WON.png",SCALE_OF_BIMGIMAGES) if red_distance < blue_distance else self.end_screen("Assets/BLUE_WON.png",SCALE_OF_BIMGIMAGES)
-            
-        
+        #print(self.time_left_in_frames/60)
+        #Log dumping
+        if CONSOLE_DUMP or FILE_DUMP:
+            #print(self.blue_tank.angle)
+            log_dump(
+            self.red_tank,self.red_cannon,self.scene["Red_Bullets"],self.red_ball_counter,self.red_button_up,self.red_button_down,self.red_button_left,self.red_button_right,self.red_cannon_rotate_left,self.red_cannon_rotate_right,self.red_cannon_shoot,self.red_cannon_rotation,self.red_ball_cooldown,self.blue_tank,self.blue_cannon,self.scene["Blue_Bullets"],self.blue_ball_counter,self.blue_button_up,self.blue_button_down,self.blue_button_left,self.blue_button_right,self.blue_cannon_rotate_left,self.blue_cannon_rotate_right,self.blue_cannon_shoot,self.blue_cannon_rotation,self.blue_ball_cooldown,self.time_left_in_frames)
         #If anyone won, don't play
         if not self.RED_WON and not self.BLUE_WON and self.time_left_in_frames>0:
             self.time_left_in_frames-=1
@@ -172,7 +180,6 @@ class GameWindow(arcade.Window):
         
             self.red_tank.stop()
             self.blue_tank.stop()
-            
             
             if not BOT_RED_MODE:
                 self.red_tank_gameplay(
@@ -186,35 +193,35 @@ class GameWindow(arcade.Window):
                 )
             else:
                 response = red_bot_algorithm(self.red_tank,self.blue_tank,list(self.scene["Red_Bullets"]),list(self.scene["Blue_Bullets"]),self.time_left_in_frames)
-                red_tf=False
-                red_tb=False
-                red_tl=False
-                red_tr=False
-                red_cl=False
-                red_cr=False
-                red_s=False
+                self.red_button_up=False
+                self.red_button_down=False
+                self.red_button_left=False
+                self.red_button_right=False
+                self.red_cannon_rotate_left=False
+                self.red_cannon_rotate_right=False
+                self.red_cannon_shoot=False
                 if "forward" in response:
-                    red_tf = True
+                    self.red_button_up = True
                 if "backward" in response:
-                    red_tb = True
+                    self.red_button_down = True
                 if "tank_rot_left" in response:
-                    red_tl = True
+                    self.red_button_left = True
                 if "tank_rot_right" in response:
-                    red_tr = True
+                    self.red_button_right = True
                 if "cannon_rot_left" in response:
-                    red_cl = True
+                    self.red_cannon_rotate_left = True
                 if "cannon_rot_right" in response:
-                    red_cr = True
+                    self.red_cannon_rotate_right = True
                 if "shoot" in response:
-                    red_s = True
+                    self.red_cannon_shoot = True
                 self.red_tank_gameplay(
-                red_tf,
-                red_tb,
-                red_tl,
-                red_tr,
-                red_cl,
-                red_cr,
-                red_s
+                self.red_button_up,
+                self.red_button_down,
+                self.red_button_left,
+                self.red_button_right,
+                self.red_cannon_rotate_left,
+                self.red_cannon_rotate_right,
+                self.red_cannon_shoot
                 )
             if not BOT_BLUE_MODE:
                 self.blue_tank_gameplay(
@@ -228,38 +235,37 @@ class GameWindow(arcade.Window):
                 )
             else:
                 response = blue_bot_algorithm(self.blue_tank,self.red_tank,self.time_left_in_frames)
-                blue_tf=False
-                blue_tb=False
-                blue_tl=False
-                blue_tr=False
-                blue_cl=False
-                blue_cr=False
-                blue_s=False
+                self.blue_button_up=False
+                self.blue_button_down=False
+                self.blue_button_left=False
+                self.blue_button_right=False
+                self.blue_cannon_rotate_left=False
+                self.blue_cannon_rotate_right=False
+                self.blue_cannon_shoot=False
                 if "forward" in response:
-                    blue_tf = True
+                    self.blue_button_up = True
                 if "backward" in response:
-                    blue_tb = True
+                    self.blue_button_down = True
                 if "tank_rot_left" in response:
-                    blue_tl = True
+                    self.blue_button_left = True
                 if "tank_rot_right" in response:
-                    blue_tr = True
+                    self.blue_button_right = True
                 if "cannon_rot_left" in response:
-                    blue_cl = True
+                    self.blue_cannon_rotate_left = True
                 if "cannon_rot_right" in response:
-                    blue_cr = True
+                    self.blue_cannon_rotate_right = True
                 if "shoot" in response:
-                    blue_s = True
+                    self.blue_cannon_shoot = True
                 self.blue_tank_gameplay(
-                blue_tf,
-                blue_tb,
-                blue_tl,
-                blue_tr,
-                blue_cl,
-                blue_cr,
-                blue_s
-                )
-                
-        
+                self.blue_button_up,
+                self.blue_button_down,
+                self.blue_button_left,
+                self.blue_button_right,
+                self.blue_cannon_rotate_left,
+                self.blue_cannon_rotate_right,
+                self.blue_cannon_shoot
+                ) 
+            
             #Positioning cannons on tanks
             #RedCannon
             self.red_cannon.center_x = self.red_tank.center_x
@@ -287,7 +293,7 @@ class GameWindow(arcade.Window):
             #Tanks with tanks WIP
             #Tu kiedyś będzie kod który powoduje remis, jak pan bóg pozwoli
             
-            #Checking if anyone won
+            #Checking if anyone hit anyone
             if blue_tank_got_hit and red_tank_got_hit:
                 self.RED_WON=True
                 self.BLUE_WON=True
@@ -298,6 +304,27 @@ class GameWindow(arcade.Window):
             elif red_tank_got_hit:
                 self.BLUE_WON = True
                 self.end_screen("Assets/BLUE_WON.png",SCALE_OF_BIMGIMAGES)
+            if self.time_left_in_frames/60<TIME_SPEEDUP:
+                red_distance = distance(self.red_tank.center_x,self.red_tank.center_y,WIDTH/2,HEIGHT/2)
+                blue_distance = distance(self.blue_tank.center_x,self.blue_tank.center_y,WIDTH/2,HEIGHT/2)
+                #If timeout, closest to middle win
+                if self.time_left_in_frames<=0:
+                    if red_distance == blue_distance:
+                        self.end_screen("Assets/DRAW.png",SCALE_OF_BIMGIMAGES)
+                    elif red_distance < blue_distance:
+                        self.end_screen("Assets/RED_WON.png",SCALE_OF_BIMGIMAGES)
+                        self.RED_WON = True
+                    else: 
+                        self.end_screen("Assets/BLUE_WON.png",SCALE_OF_BIMGIMAGES)
+                        self.BLUE_WON = True
+                #This means we are in SPEEDUP limit
+                else:
+                    if red_distance == blue_distance:
+                        self.WhoIsWinning = "None"
+                    elif red_distance > blue_distance:
+                        self.WhoIsWinning = "Blue"
+                    else:
+                        self.WhoIsWinning = "Red"
         
     def on_key_press(self,symbol,modifiers):
         #Red Tank Controls
@@ -388,11 +415,16 @@ class GameWindow(arcade.Window):
         END.center_y = HEIGHT/2
         self.scene.add_sprite("END_SCREEN", END)
     def blue_tank_gameplay(self,forward=False,backward=False,tank_rot_left=False,tank_rot_right=False,cannon_rot_left=False,cannon_rot_right=False,shoot=False):
+        #Utilities
+        if self.WhoIsWinning != "Blue":
+            current_speed = BLUE_TANK_SPEED
+        else:
+            current_speed = BLUE_TANK_SPEED * SPEED_MULTIPLIER
         #Blue Tank Movement 
         if forward:
-            self.blue_tank.strafe(BLUE_TANK_SPEED)
+            self.blue_tank.strafe(current_speed)
         if backward:
-            self.blue_tank.strafe(-BLUE_TANK_SPEED)
+            self.blue_tank.strafe(-current_speed)
         if tank_rot_left:
             self.blue_tank.turn_left(ROTATION_SPEED)
         if tank_rot_right:
@@ -415,11 +447,16 @@ class GameWindow(arcade.Window):
             self.blue_ball_cooldown -= 1
             
     def red_tank_gameplay(self,forward=False,backward=False,tank_rot_left=False,tank_rot_right=False,cannon_rot_left=False,cannon_rot_right=False,shoot=False):
+        #Utilities
+        if self.WhoIsWinning != "Red":
+            current_speed = RED_TANK_SPEED
+        else:
+            current_speed = RED_TANK_SPEED * SPEED_MULTIPLIER
         #Red Tank Movement
         if forward:
-            self.red_tank.strafe(RED_TANK_SPEED)
+            self.red_tank.strafe(current_speed)
         if backward:
-            self.red_tank.strafe(-RED_TANK_SPEED)
+            self.red_tank.strafe(-current_speed)
         if tank_rot_left:
             self.red_tank.turn_left(ROTATION_SPEED)
         if tank_rot_right:
@@ -440,7 +477,7 @@ class GameWindow(arcade.Window):
                     self.red_ball_cooldown=COOLDOWN_BETWEEN_BALLS
         else:
             self.red_ball_cooldown-=1  
-def red_bot_algorithm(myTank,enemyTank,,myBulletList,enemyBulletList,frames_left):
+def red_bot_algorithm(myTank,enemyTank,myBulletList,enemyBulletList,frames_left):
         #Here paste algorithm for red tank  #The system is simple. If you want your tank to do specific aciton in current frame, add keyword to the "response" list by using response.append("KEYWORD")
         
         #Keywords in response:
@@ -486,7 +523,116 @@ def blue_bot_algorithm(myTank,enemyTank,frames_left):
         #frames_left -> time in frames before end of game. To get seconds, dividing this by 60
         response = ["forward","tank_rot_left","cannon_rot_right","shoot"]
         return response
+def log_dump(red_tank,red_cannon,red_bullets,red_bullets_counter,red_forward,red_back,red_t_left,red_t_right,red_c_left,red_c_right,red_isShooting,red_cannon_rotation,red_ball_cooldown,blue_tank,blue_cannon,blue_bullets,blue_bullets_counter,blue_forward,blue_back,blue_t_left,blue_t_right,blue_c_left,blue_c_right,blue_isShooting,blue_cannon_rotation,blue_ball_cooldown,frames_left):
+    #List of data
+    red_x =                 red_tank.center_x
+    red_y =                 red_tank.center_y
+    red_rotation =          red_tank.angle%360
+    red_cannonRotation =    red_cannon.angle%360
+    red_velocityX =         red_tank.change_x
+    red_velocityY =         red_tank.change_y
+    red_shootCooldown =     red_ball_cooldown
+    
+    red_turnLeft =          red_t_left
+    red_turnRight =         red_t_right
+    red_goForward =         red_forward
+    red_goBack =            red_back
+    red_shoot =             red_isShooting
+    red_cannonLeft =        red_c_left
+    red_cannonRight =       red_c_right
+    
+    if  red_bullets_counter == 3:
+        red_bullet3_x =         red_bullets[2].center_x
+        red_bullet3_y =         red_bullets[2].center_y
+        red_bullet3_velocityX = red_bullets[2].change_x
+        red_bullet3_velocityY = red_bullets[2].change_y
+    else:
+        red_bullet3_x =         0
+        red_bullet3_y =         0
+        red_bullet3_velocityX = 0
+        red_bullet3_velocityY = 0
+    if  red_bullets_counter > 1:
+        red_bullet2_x =         red_bullets[1].center_x
+        red_bullet2_y =         red_bullets[1].center_y
+        red_bullet2_velocityX = red_bullets[1].change_x
+        red_bullet2_velocityY = red_bullets[1].change_y
+    else:
+        red_bullet2_x =         0
+        red_bullet2_y =         0
+        red_bullet2_velocityX = 0
+        red_bullet2_velocityY = 0
+    if  red_bullets_counter > 0:
+        red_bullet1_x =         red_bullets[0].center_x
+        red_bullet1_y =         red_bullets[0].center_y
+        red_bullet1_velocityX = red_bullets[0].change_x
+        red_bullet1_velocityY = red_bullets[0].change_y
+    else:
+        red_bullet1_x =         0
+        red_bullet1_y =         0
+        red_bullet1_velocityX = 0
+        red_bullet1_velocityY = 0
+    
+    red_data = (red_x,red_y,red_rotation,red_cannonRotation,red_velocityX,red_velocityY,red_shootCooldown,red_turnLeft,red_turnRight,red_goForward,red_goBack,red_shoot,red_cannonLeft,red_cannonRight,red_bullet3_x,red_bullet3_y,red_bullet3_velocityX,red_bullet3_velocityY,red_bullet2_x,red_bullet2_y,red_bullet2_velocityX,red_bullet2_velocityY,red_bullet1_x,red_bullet1_y,red_bullet1_velocityX,red_bullet1_velocityY)
+    
+    blue_x =                 blue_tank.center_x
+    blue_y =                 blue_tank.center_y
+    blue_rotation =          blue_tank.angle%360
+    blue_cannonRotation =    blue_cannon.angle%360
+    blue_velocityX =         blue_tank.change_x
+    blue_velocityY =         blue_tank.change_y
+    blue_shootCooldown =     blue_ball_cooldown
 
+    blue_turnLeft =          blue_t_left
+    blue_turnRight =         blue_t_right
+    blue_goForward =         blue_forward
+    blue_goBack =            blue_back
+    blue_shoot =             blue_isShooting
+    blue_cannonLeft =        blue_c_left
+    blue_cannonRight =       blue_c_right
+    
+    if  blue_bullets_counter == 3:
+        blue_bullet3_x =         blue_bullets[2].center_x
+        blue_bullet3_y =         blue_bullets[2].center_y
+        blue_bullet3_velocityX = blue_bullets[2].change_x
+        blue_bullet3_velocityY = blue_bullets[2].change_y
+    else:
+        blue_bullet3_x =         0
+        blue_bullet3_y =         0
+        blue_bullet3_velocityX = 0
+        blue_bullet3_velocityY = 0
+    if  blue_bullets_counter > 1:
+        blue_bullet2_x =         blue_bullets[1].center_x
+        blue_bullet2_y =         blue_bullets[1].center_y
+        blue_bullet2_velocityX = blue_bullets[1].change_x
+        blue_bullet2_velocityY = blue_bullets[1].change_y
+    else:
+        blue_bullet2_x =         0
+        blue_bullet2_y =         0
+        blue_bullet2_velocityX = 0
+        blue_bullet2_velocityY = 0
+    if  blue_bullets_counter > 0:
+        blue_bullet1_x =         blue_bullets[0].center_x
+        blue_bullet1_y =         blue_bullets[0].center_y
+        blue_bullet1_velocityX = blue_bullets[0].change_x
+        blue_bullet1_velocityY = blue_bullets[0].change_y
+    else:
+        blue_bullet1_x =         0
+        blue_bullet1_y =         0
+        blue_bullet1_velocityX = 0
+        blue_bullet1_velocityY = 0
+    
+    blue_data = (blue_x,blue_y,blue_rotation,blue_cannonRotation,blue_velocityX,blue_velocityY,blue_shootCooldown,blue_turnLeft,blue_turnRight,blue_goForward,blue_goBack,blue_shoot,blue_cannonLeft,blue_cannonRight,blue_bullet3_x,blue_bullet3_y,blue_bullet3_velocityX,blue_bullet3_velocityY,blue_bullet2_x,blue_bullet2_y,blue_bullet2_velocityX,blue_bullet2_velocityY,blue_bullet1_x,blue_bullet1_y,blue_bullet1_velocityX,blue_bullet1_velocityY,frames_left/60)
+    
+    #Actually writing stuff out
+    if CONSOLE_DUMP:
+        print(red_data+blue_data)
+    #if FILE_DUMP:
+    #    if NEW_FILE:
+    #        ts = time.time()
+    #        
+    #    else:
+    #        with open('', 'a') as f:
+    #            f.write(red_data+blue_data)
 GameWindow(WIDTH,HEIGHT,"THE TANK GAME by Chili0xFF", arcade.color.CADET_GREY)
 arcade.enable_timings()
 
