@@ -1,4 +1,5 @@
 import arcade
+arcade.enable_timings()
 import math
 import random
 import time
@@ -12,13 +13,10 @@ BLUE_BOT_MODE = False
 TOURNAMENT_MODE = True
 TOURNAMENT_AUTOSKIP = True
 
-ALTERNATIVE_MAP = False
-
 TIME_LIMIT = 20 #In seconds
 TIME_SPEEDUP = 10 #If timeleft < TIME_SPEEDUP: Speed of bullets of the closest tank to the middle goes up
 
 CONSOLE_DUMP = False
-#PRINT_NAMES_IN_CONSOLE = True #Only usable if CONSOLE_DUMP == True
 
 SCALE_OF_BIG_IMAGES = WIN_HEIGHT/1080
 SCALE_OF_SMALL_IMAGES = SCALE_OF_BIG_IMAGES/3*6      #Rescaling graphics to match any resolution of screen
@@ -31,19 +29,13 @@ INITIAL_ROTATION_SPEED = 1
 INITIAL_BULLET_COOLDOWN = 60       #In frames. Sec * 60
 INITIAL_BULLET_MAX = 33
 
-player1=None
-player2=None
-
-who_won=0
-
 def distance(x1 , y1 , x2 , y2):
     #For calculating distace between two points, accessory function
     return math.sqrt(math.pow(x2 - x1, 2) +
                 math.pow(y2 - y1, 2) * 1.0)
 def dataGatherer(tank,cannon,bullet_list):
-    #tank x/y, tank rotation, cannon rotation, tank velocity x/y, tank acceleration x/y, shoot cooldown, last 3 bullets (x/y, velocity x/y)
-    #
-    #
+        #Here we gather the informations about the tank, the cannon and the bullets of said cannon
+        # and return it as a dictionary
     data = dict()
     data["tank x"]=tank.center_x
     data["tank y"]=tank.center_y
@@ -72,7 +64,7 @@ def dataGatherer(tank,cannon,bullet_list):
 class GameWindow(arcade.Window):
     def __init__(self,width,height,title,color):
         super().__init__(width,height,title)
-        arcade.set_background_color(color)
+        
         
         #In order to start new game, we clear the entire scene and all the variables
         self.scene = None
@@ -81,10 +73,8 @@ class GameWindow(arcade.Window):
         
         self.setup()
     def setup(self):
-            #Setting up scene and sprite lists
+            #Setting up scene and sprite lists. This of it as "layers". First added is the lowest
         self.scene = arcade.Scene()
-        
-        
         
         self.scene.add_sprite_list("Background")
         self.scene.add_sprite_list("Players")
@@ -92,8 +82,9 @@ class GameWindow(arcade.Window):
         self.scene.add_sprite_list("Cannons")
         self.scene.add_sprite_list("Red_Bullets")
         self.scene.add_sprite_list("Blue_Bullets")
-        
         self.scene.add_sprite_list("End_screen")
+        
+        self.background=arcade.load_texture("Assets/BG.png")
         
         self.time_left = TIME_LIMIT*60
             #Spawning Blue Tank
@@ -192,6 +183,9 @@ class GameWindow(arcade.Window):
         self.playing = True
     def on_draw(self):
         self.clear()
+        arcade.draw_lrwh_rectangle_textured(0, 0,
+                                            WIN_WIDTH, WIN_HEIGHT,
+                                            self.background)
         if TOURNAMENT_MODE:
             arcade.draw_text(str(player1[0].__name__),
                          -150,
@@ -266,7 +260,7 @@ class GameWindow(arcade.Window):
                     self.movement(self.red_tank,self.red_cannon)
                     self.shooting(self.red_cannon,"Red_Bullets")
             
-            #Colissions
+            #Detecting colissions
                 #Bullets with Walls
             for bullet in self.scene["Red_Bullets"]:
                 wall_hit_list = arcade.check_for_collision_with_list(bullet,self.scene["Walls"])
@@ -282,11 +276,10 @@ class GameWindow(arcade.Window):
             Red_Got_Hit = arcade.check_for_collision_with_list(self.red_tank,self.scene["Blue_Bullets"])
             Blue_Got_Hit = arcade.check_for_collision_with_list(self.blue_tank,self.scene["Red_Bullets"])
             
-            #Checking if anyone hit anyone
+            #Checking if collisions on tanks were found
             if Blue_Got_Hit and Red_Got_Hit:
                 self.end_screen("Assets/DRAW.png",SCALE_OF_BIG_IMAGES)
                 self.playing=False
-                
                 who_won = 0
             elif Blue_Got_Hit:
                 self.end_screen("Assets/RED_WON.png",SCALE_OF_BIG_IMAGES)
@@ -296,7 +289,8 @@ class GameWindow(arcade.Window):
                 self.end_screen("Assets/BLUE_WON.png",SCALE_OF_BIG_IMAGES)
                 self.playing=False
                 who_won = 1
-            #Time section
+            
+            #Time events
             self.time_left-=1
             if self.time_left < TIME_SPEEDUP*60:
                 red_distance = distance(self.red_tank.center_x,self.red_tank.center_y,WIN_WIDTH/2,WIN_HEIGHT/2)
@@ -323,8 +317,6 @@ class GameWindow(arcade.Window):
                     else:
                         self.red_cannon.bul_speed=BOOSTED_BULLET_SPEED
                         self.blue_cannon.bul_speed=BOOSTED_BULLET_SPEED
-                    
-            
             
             if CONSOLE_DUMP:
                 dataDump(Red_data,Blue_data,self.time_left)
@@ -474,32 +466,76 @@ def dataDump(redData,blueData,time_left):
     print(redData)
     print(blueData)
     print(time_left)
+# Tutorial for writing algorithms for tanks
+# Variables:
+    #Me -> Information about ally tank, as dictionary 
+    #Available information: 
+        #"tank x"           -> x-axis position of tank
+        #"tank y"           -> y-axis position of tank
+        #"tank rotation"    -> current rotation of tank
+        #"tank velocity x"  -> x-axis velocity of tank
+        #"tank velocity y"  -> y-axis velocity of tank
+        #"cannon rotation"  -> current rotation of cannon
+        #"bullet cooldown"  -> counted in frames
+    #Enemy -> Information about enemy tank    
+    #Available information: 
+        #"tank x"           -> x-axis position of tank
+        #"tank y"           -> y-axis position of tank
+        #"tank rotation"    -> current rotation of tank
+        #"tank velocity x"  -> x-axis velocity of tank
+        #"tank velocity y"  -> y-axis velocity of tank
+        #"cannon rotation"  -> current rotation of cannon
+        #"bullet cooldown"  -> counted in frames
+    #frames_left -> How many frames are left before end of game
+# Commands
+    # forward       -> tank goes forward
+    # backward      -> tank goes backward
+    # tank_left     -> tank rotates left
+    # tank_right    -> tank rotates rights
+    # cannon_left   -> cannon rotates left
+    # cannon_right  -> cannon rotates rights
+    # shoot         -> cannon shoots, if possible
+# General information
+    # Response is a set of commands that will be executed in current frame
+    # Response should be in a form of a list, with commands separated
+    # Me and Enemy dictionaries are cleared and re-filled every frame
 def red_bot_algorithm(Me,Enemy,frames_left):
     response = ["forward","tank_right","cannon_left","shoot"]
     return response
 def blue_bot_algorithm(Me,Enemy,frames_left):
     response = ["forward","tank_left","cannon_right","shoot"]
     return response
-
-arcade.enable_timings()
-
 if TOURNAMENT_MODE:
+    player1=None
+    player2=None
+    #This variable is global, and will be used after every match to retrieve the result
+    #It's done this way, because arcade does not allow for returning any variables after closing window
+    who_won=0 
+    #Retrieves all the function names in the tournament_algorithms.py file.
+    #If not all of the functions in the tournament_algorithms are playable (ex. distance calculating), you will have to provide the names of functions yourself as a list:
+    #ex. theTanks = ["s23049","s24992","ChiliTheProTankerFunction"]
     theTanks = [func for func in dir(tournament_algorithms) if not func.startswith('__')]
 
+    # we retrieve the functions found above, and put them into a dictionary, with amount of points on the side
     theTankFunctions = dict()
     for tank in theTanks:
         theTankFunctions[tank] = [getattr(tournament_algorithms,tank),0]
 
+    #In this solution, each player fights every other player twice. Second is a form of a "rematch" in case any player is salty that the enemy "got lucky". 
     for x in theTankFunctions:
         for y in theTankFunctions:
             if x == y:
+                #We don't want players to fight themselves, that would be rather counter intuitive
                 print("mirror, passing")
             else:
+                #We pack the players into global variables, that are available in the on_update functions
                 player1 = theTankFunctions[x]
                 player2 = theTankFunctions[y]
+                #Each time, we start a game. The script after "arcade.run" won't go any further, until the game is finished
                 GameWindow(WIN_WIDTH,WIN_HEIGHT,"THE TANK GAME by Chili0xFF", arcade.color.CADET_GREY)
                 arcade.run()
                 arcade.close_window()
+                #After the game is finished, we check who won and assign the score to the correct player
                 if who_won == 0:
                     print("Draw! Points were not awarded")
                 else:
@@ -508,6 +544,8 @@ if TOURNAMENT_MODE:
                         theTankFunctions[x][1]+=1
                     elif who_won ==2:
                         theTankFunctions[y][1]+=1
+    
+    #After the tournament, we list all of the players with their scores
     print("end of tournament")
     print("_________________")
     print("name   ||  points")
@@ -517,9 +555,7 @@ else:
     GameWindow(WIN_WIDTH,WIN_HEIGHT,"THE TANK GAME by Chili0xFF", arcade.color.CADET_GREY)
     arcade.run()
 
-
-
 #Game made by Chili0xFF. No rights reserved. For educational purposes only
 #Please consider buying me coffee if you see me in the hallway: Grey hair, always tired. 
-#If you ever use this project for literally any reason, please send me an email, it would be nice :>
+#If you ever use this project for literally any reason, please send me an email :>
 #Thanks

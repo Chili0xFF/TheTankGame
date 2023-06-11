@@ -84,8 +84,12 @@ class GameWindow(arcade.Window):
         self.scene.add_sprite_list("Cannons")
         self.scene.add_sprite_list("Red_Bullets")
         self.scene.add_sprite_list("Blue_Bullets")
-        
         self.scene.add_sprite_list("End_screen")
+        
+        self.BackGround = arcade.Sprite("Assets/BG.png",SCALE_OF_BIG_IMAGES)
+        self.BackGround.center_x = WIN_HEIGHT/2
+        self.BackGround.center_y = WIN_WIDTH/2
+        self.scene.add_sprite("Background",self.BackGround)
         
         self.time_left = TIME_LIMIT*60
             #Spawning Blue Tank

@@ -69,6 +69,8 @@ class GameWindow(arcade.Window):
         self.scene.add_sprite_list("Blue_Bullets")
         self.scene.add_sprite_list("END_SCREEN")
         
+        self.BackGround = arcade.Sprite("Assets/BG.png",SCALE_OF_BIMGIMAGES)
+        
         #randomising on which side the player will start
         side = random.randint(0,1)
         
