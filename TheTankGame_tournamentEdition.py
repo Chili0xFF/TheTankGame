@@ -2,21 +2,22 @@ import arcade
 import math
 import random
 import time
+import tournament_algorithms
 
 WIN_WIDTH = 720  
 WIN_HEIGHT = 480
 
-RED_BOT_MODE = True
-BLUE_BOT_MODE = True
-TOURNAMENT_MODE = False
-TOURNAMENT_PATH = None
+RED_BOT_MODE = False
+BLUE_BOT_MODE = False
+TOURNAMENT_MODE = True
+TOURNAMENT_AUTOSKIP = True
 
 ALTERNATIVE_MAP = False
 
 TIME_LIMIT = 20 #In seconds
 TIME_SPEEDUP = 10 #If timeleft < TIME_SPEEDUP: Speed of bullets of the closest tank to the middle goes up
 
-CONSOLE_DUMP = True
+CONSOLE_DUMP = False
 #PRINT_NAMES_IN_CONSOLE = True #Only usable if CONSOLE_DUMP == True
 
 SCALE_OF_BIG_IMAGES = WIN_HEIGHT/1080
@@ -30,11 +31,10 @@ INITIAL_ROTATION_SPEED = 1
 INITIAL_BULLET_COOLDOWN = 60       #In frames. Sec * 60
 INITIAL_BULLET_MAX = 33
 
+player1=None
+player2=None
 
-theTanks = ["tank1","tank2","tank3","tank4"]
-
-
-
+who_won=0
 
 def distance(x1 , y1 , x2 , y2):
     #For calculating distace between two points, accessory function
@@ -83,6 +83,8 @@ class GameWindow(arcade.Window):
     def setup(self):
             #Setting up scene and sprite lists
         self.scene = arcade.Scene()
+        
+        
         
         self.scene.add_sprite_list("Background")
         self.scene.add_sprite_list("Players")
@@ -190,9 +192,33 @@ class GameWindow(arcade.Window):
         self.playing = True
     def on_draw(self):
         self.clear()
+        if TOURNAMENT_MODE:
+            arcade.draw_text(str(player1[0].__name__),
+                         -150,
+                         WIN_HEIGHT-(WALL_SIZE_IN_PIXELS*2),
+                         arcade.color.BLUE,
+                         20 * 2,
+                         width=WIN_WIDTH,
+                         align="center")
+            arcade.draw_text("vs",
+                         0,
+                         WIN_HEIGHT-(WALL_SIZE_IN_PIXELS*2),
+                         arcade.color.BLACK,
+                         20 * 2,
+                         width=WIN_WIDTH,
+                         align="center")
+            arcade.draw_text(str(player2[0].__name__),
+                         150,
+                         WIN_HEIGHT-(WALL_SIZE_IN_PIXELS*2),
+                         arcade.color.RED,
+                         20 * 2,
+                         width=WIN_WIDTH,
+                         align="center")
         self.scene.draw()
+        
     def on_update(self,delta_time):
         if self.playing:
+            global who_won
             #Updating all the engines to move the sprites around
             self.physics_engine_red.update()
             self.physics_engine_blue.update()
@@ -216,7 +242,14 @@ class GameWindow(arcade.Window):
             
             #Moving and shooting
             if TOURNAMENT_MODE:
-                print("Tournament mode not implemented")
+                #BlueActions
+                response = player1[0](Blue_data,Red_data,self.time_left)
+                self.responseInterpreter(self.blue_tank,self.blue_cannon,"Blue_Bullets",response)
+                
+                #RedActions
+                response = player2[0](Red_data,Blue_data,self.time_left)
+                self.responseInterpreter(self.red_tank,self.red_cannon,"Red_Bullets",response)
+                
             else:
                 #BlueActions
                 if BLUE_BOT_MODE:
@@ -253,12 +286,16 @@ class GameWindow(arcade.Window):
             if Blue_Got_Hit and Red_Got_Hit:
                 self.end_screen("Assets/DRAW.png",SCALE_OF_BIG_IMAGES)
                 self.playing=False
+                
+                who_won = 0
             elif Blue_Got_Hit:
                 self.end_screen("Assets/RED_WON.png",SCALE_OF_BIG_IMAGES)
                 self.playing=False
+                who_won = 2
             elif Red_Got_Hit:
                 self.end_screen("Assets/BLUE_WON.png",SCALE_OF_BIG_IMAGES)
                 self.playing=False
+                who_won = 1
             #Time section
             self.time_left-=1
             if self.time_left < TIME_SPEEDUP*60:
@@ -268,10 +305,13 @@ class GameWindow(arcade.Window):
                 if self.time_left == 0:
                     if red_distance < blue_distance:
                         self.end_screen("Assets/RED_WON.png",SCALE_OF_BIG_IMAGES)
+                        who_won = 2
                     elif blue_distance < red_distance:
                         self.end_screen("Assets/BLUE_WON.png",SCALE_OF_BIG_IMAGES)
+                        who_won = 1
                     else:
                         self.end_screen("Assets/DRAW.png",SCALE_OF_BIG_IMAGES)
+                        who_won = 0
                     self.playing=False
                 else:
                     if red_distance < blue_distance:
@@ -288,6 +328,10 @@ class GameWindow(arcade.Window):
             
             if CONSOLE_DUMP:
                 dataDump(Red_data,Blue_data,self.time_left)
+        else:
+            if TOURNAMENT_AUTOSKIP:
+                arcade.pause(1.0)
+                arcade.close_window()
     def on_key_press(self,symbol,modifiers):
         match symbol:
             #Blue Tank Controls
@@ -436,13 +480,43 @@ def red_bot_algorithm(Me,Enemy,frames_left):
 def blue_bot_algorithm(Me,Enemy,frames_left):
     response = ["forward","tank_left","cannon_right","shoot"]
     return response
-def tournament_algorithm():
-    print("No implement")
-#Turning on the game
-GameWindow(WIN_WIDTH,WIN_HEIGHT,"THE TANK GAME by Chili0xFF", arcade.color.CADET_GREY)
+
 arcade.enable_timings()
 
-arcade.run()
+if TOURNAMENT_MODE:
+    theTanks = [func for func in dir(tournament_algorithms) if not func.startswith('__')]
+
+    theTankFunctions = dict()
+    for tank in theTanks:
+        theTankFunctions[tank] = [getattr(tournament_algorithms,tank),0]
+
+    for x in theTankFunctions:
+        for y in theTankFunctions:
+            if x == y:
+                print("mirror, passing")
+            else:
+                player1 = theTankFunctions[x]
+                player2 = theTankFunctions[y]
+                GameWindow(WIN_WIDTH,WIN_HEIGHT,"THE TANK GAME by Chili0xFF", arcade.color.CADET_GREY)
+                arcade.run()
+                arcade.close_window()
+                if who_won == 0:
+                    print("Draw! Points were not awarded")
+                else:
+                    print("Player"+str(who_won)+" won!")
+                    if who_won == 1:
+                        theTankFunctions[x][1]+=1
+                    elif who_won ==2:
+                        theTankFunctions[y][1]+=1
+    print("end of tournament")
+    print("_________________")
+    print("name   ||  points")
+    for x in theTankFunctions:
+        print(str(theTankFunctions[x][0].__name__)+" ||  "+str(theTankFunctions[x][1]))
+else:
+    GameWindow(WIN_WIDTH,WIN_HEIGHT,"THE TANK GAME by Chili0xFF", arcade.color.CADET_GREY)
+    arcade.run()
+
 
 
 #Game made by Chili0xFF. No rights reserved. For educational purposes only
