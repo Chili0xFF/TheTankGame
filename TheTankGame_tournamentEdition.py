@@ -227,10 +227,10 @@ class GameWindow(arcade.Window):
             #Positioning cannons on tanks
                 #BlueCannon
             self.blue_cannon.center_x = self.blue_tank.center_x
-            self.blue_cannon.center_y = self.blue_tank.center_y+5
+            self.blue_cannon.center_y = self.blue_tank.center_y
                 #RedCannon
             self.red_cannon.center_x = self.red_tank.center_x
-            self.red_cannon.center_y = self.red_tank.center_y+5
+            self.red_cannon.center_y = self.red_tank.center_y
             
             #Gathering Data
             Blue_data = dataGatherer(self.blue_tank,self.blue_cannon,list(self.scene["Blue_Bullets"]))
