@@ -30,6 +30,12 @@ INITIAL_ROTATION_SPEED = 1
 INITIAL_BULLET_COOLDOWN = 60       #In frames. Sec * 60
 INITIAL_BULLET_MAX = 33
 
+
+theTanks = ["tank1","tank2","tank3","tank4"]
+
+
+
+
 def distance(x1 , y1 , x2 , y2):
     #For calculating distace between two points, accessory function
     return math.sqrt(math.pow(x2 - x1, 2) +
